@@ -1,0 +1,11 @@
+---
+BasedOnStyle: Google
+AllowShortIfStatementsOnASingleLine: Never
+AccessModifierOffset: -4
+BreakBeforeBraces: Allman
+IndentWidth: 4
+PointerAlignment: Right
+UseTab: Never
+SortIncludes: Never
+ColumnLimit: 0
+NamespaceIndentation: All
