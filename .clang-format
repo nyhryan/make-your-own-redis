@@ -1,11 +1,13 @@
 ---
-BasedOnStyle: Google
 AllowShortIfStatementsOnASingleLine: Never
 AccessModifierOffset: -4
 BreakBeforeBraces: Allman
 IndentWidth: 4
 PointerAlignment: Right
+ReferenceAlignment: Right
+AlignTrailingComments: true
 UseTab: Never
 SortIncludes: Never
 ColumnLimit: 0
 NamespaceIndentation: All
+Cpp11BracedListStyle: false

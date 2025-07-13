@@ -1,12 +1,12 @@
 #include "socket.hpp"
 #include "exception.hpp"
 #include "types.hpp"
-#include "util.hpp"
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <cstring>
 #include <cerrno>
@@ -15,72 +15,49 @@
 
 namespace my_redis::sockets
 {
+    using namespace my_redis::types;
 
-    TCP_Socket::TCP_Socket(u32 ip, u16 port) : fd(-1), ip(ip), port(port)
+    void Socket::setNonBlock() const
     {
-        this->fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (-1 == fd)
+        auto flags = ::fcntl(m_Fd, F_GETFL);
+        if (-1 == flags)
         {
-            throw exception::errno_exception{"TCP_Socket::TCP_Socket()", errno};
+            throw exception::errno_exception{ "void Socket::setNonBlock() const -> fcntl(F_GETFL)" };
         }
+
+        flags |= O_NONBLOCK;
+        
+        if (-1 == ::fcntl(m_Fd, F_SETFL, flags))
+        {
+            throw exception::errno_exception{ "void Socket::setNonBlock() const -> fcntl(F_SETFL)" };
+        }        
     }
 
-    TCP_Socket::~TCP_Socket()
+    ServerSocket::ServerSocket(const Endpoint &endpoint)
     {
-        auto result = close(fd);
-        if (-1 == result)
+        Socket s{ ::socket(AF_INET, SOCK_STREAM, 0) };
+        if (!s.isValid())
         {
-            std::fprintf(stderr, "TCP_Socket::~TCP_Socket() %s", util::strerror(errno).c_str());
-        }
-    }
-
-    namespace
-    {
-        void bind(i32 fd, sockaddr_in *addr)
-        {
-            auto result = ::bind(fd, reinterpret_cast<const sockaddr *>(addr), sizeof(*addr));
-            if (-1 == result)
-            {
-                throw exception::errno_exception{"void bindAndListen(const TCP_Socket& socket)", errno};
-            }
+            throw exception::errno_exception{ "ServerSocket::ServerSocket(const Endpoint &endpoint) -> socket()" };
         }
 
-        void listen(i32 fd)
+        auto _true = 1;
+        setsockopt(s.fd(), SOL_SOCKET, SO_REUSEADDR, &_true, sizeof(_true));
+
+        s.setNonBlock();
+
+        auto sockaddr = endpoint.sockaddr();
+        if (-1 == ::bind(s.fd(), (const struct sockaddr *)&sockaddr, sizeof(sockaddr)))
         {
-            auto result = ::listen(fd, SOMAXCONN);
-            if (-1 == result)
-            {
-                throw exception::errno_exception{"void bindAndListen(const TCP_Socket& socket)", errno};
-            }
+            throw exception::errno_exception{ "ServerSocket::ServerSocket(const Endpoint &endpoint) -> bind()" };
         }
-    }  // namespace
-
-    void bindAndListen(const TCP_Socket &socket)
-    {
-        // Assert that the file descriptor is valid
-        assert(socket.fd > 0);
-
-        sockaddr_in addr = {.sin_family = AF_INET,
-                            .sin_port = htons(socket.port),
-                            .sin_addr = {.s_addr = htonl(socket.ip)}};
-
-        // Bind the socket to the address and port
-        // and listen for incoming connections
-        bind(socket.fd, &addr);
-        listen(socket.fd);
-    }
-
-    void connect(const TCP_Socket &socket)
-    {
-        sockaddr_in addr = {.sin_family = AF_INET,
-                            .sin_port = htons(socket.port),
-                            .sin_addr = {.s_addr = htonl(socket.ip)}};
-
-        auto result = connect(socket.fd, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr));
-        if (-1 == result)
+        
+        if (-1 == ::listen(s.fd(), SOMAXCONN))
         {
-            throw my_redis::exception::errno_exception{"void connect(const TCP_Socket& socket)", errno};
+            throw exception::errno_exception{ "ServerSocket::ServerSocket(const Endpoint &endpoint) -> listen()" };
         }
+
+        this->operator=(std::move(s));
     }
 
     IOResultType read(i32 fd, u8 *buffer, size n)
@@ -125,4 +102,4 @@ namespace my_redis::sockets
         return IOResultType::OK;
     }
 
-}  // namespace my_redis::sockets
+} // namespace my_redis::sockets

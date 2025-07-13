@@ -2,59 +2,102 @@
 
 #include "types.hpp"
 
-#include <format>
-#include <string>
-
+#include <fcntl.h>
+#include <netinet/ip.h>
+#include <sys/poll.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/ip.h>
+#include <unistd.h>
+
+#include <format>
+#include <string>
+#include <utility>
 
 namespace my_redis::sockets
 {
-
-struct TCP_Socket
-{
-    i32 fd;
-    u32 ip;
-    u16 port;
-
-    // Sets ip and port member variables. Creates a file descriptor with socket(), but does not bind or listen yet.
-    TCP_Socket(u32 ip, u16 port);
-
-    // Creates a TCP_Socket with an existing file descriptor, IP address, and port.
-    constexpr TCP_Socket(i32 fd, u32 ip, u16 port) : fd(fd), ip(ip), port(port)
+    struct Endpoint
     {
-    }
+        const char *ip;
+        types::u16 port;
 
-    // Closes the file descriptor when the TCP_Socket is destroyed.
-    ~TCP_Socket();
+        constexpr sockaddr_in sockaddr() const noexcept
+        {
+            return sockaddr_in{
+                .sin_family = AF_INET,
+                .sin_port = htons(port),
+                .sin_addr = { .s_addr = inet_addr(ip) },
+            };
+        }
 
-    TCP_Socket(const TCP_Socket&)               = delete;
-    TCP_Socket(TCP_Socket&&)                    = delete;
-    TCP_Socket& operator=(const TCP_Socket&)    = delete;
-    TCP_Socket operator=(TCP_Socket&&)          = delete;
+        constexpr socklen_t socklen() const noexcept { return sizeof(sockaddr()); }
 
-    // Returns a string representation of the TCP_Socket in the format "ip:port".
-    std::string toString() const
+        constexpr std::string toString() const noexcept
+        {
+            return std::format("{}:{}", ip, ntohs(port));
+        }
+    };
+
+    class Socket
     {
-        return std::format("{}:{}", inet_ntoa({.s_addr = ip}), port);
-    }
-};
+    public:
+        Socket() = default;
+        explicit Socket(types::i32 fd) : m_Fd(fd) {}
+        virtual ~Socket()
+        {
+            if (m_Fd >= 0)
+            {
+                ::close(m_Fd);
+            }
+        }
 
-// Creates a TCP socket, binds it to the specified address and port, and listens for incoming connections.
-void bindAndListen(const TCP_Socket& socket);
+        Socket(Socket &&other) : m_Fd(std::exchange(other.m_Fd, -1))
+        {
+        }
+        
+        Socket &operator=(Socket &&other) noexcept
+        {
+            if (this != &other)
+            {
+                if (m_Fd >= 0)
+                    ::close(m_Fd);
 
-// Accepts an incoming connection on the specified socket and returns a new TCP_Socket for the accepted connection.
-void connect(const TCP_Socket& socket);
+                m_Fd = std::exchange(other.m_Fd, -1);
+            }
 
-enum class IOResultType
-{
-    OK,
-    _EOF,
-    ERR
-};
+            return *this;
+        }
 
-IOResultType read(i32 fd, u8* buffer, size n);
-IOResultType write(i32 fd, const u8* buffer, size n);
+        Socket(const Socket &)              = delete;
+        Socket &operator=(const Socket &)   = delete;
 
-}  // namespace my_redis::sockets
+    public:
+        void setNonBlock() const;
+        constexpr types::i32 fd() const noexcept { return m_Fd; }
+        constexpr bool isValid() const noexcept { return m_Fd >= 0; }
+
+    private:
+        types::i32 m_Fd{ -1 };
+    };
+
+    class ServerSocket : public my_redis::sockets::Socket
+    {
+    public:
+        using Socket::operator=;
+        ServerSocket(const Endpoint &endpoint);
+
+    public:
+        Socket accept() const;
+    };
+
+    enum class IOResultType
+    {
+        OK,
+        _EOF,
+        ERR
+    };
+
+    IOResultType read(types::i32 fd, types::u8 *buffer, types::size n);
+    IOResultType write(types::i32 fd, const types::u8 *buffer, types::size n);
+
+} // namespace my_redis::sockets

@@ -1,7 +1,9 @@
 #pragma once
 
-#include <string>
 #include <cstring>
+
+#include <format>
+#include <string>
 
 namespace my_redis::util
 {
@@ -11,7 +13,7 @@ namespace my_redis::util
     {
         auto name = std::string{strerrorname_np(errnum)};
         auto desc = std::string{strerrordesc_np(errnum)};
-        return name + ": " + desc;
+        return std::format("{1}({0})", name, desc);
     }
 
 }  // namespace my_redis::util
