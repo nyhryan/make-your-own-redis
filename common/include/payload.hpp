@@ -17,8 +17,8 @@ namespace my_redis::payload
     */
     constexpr types::size HEADER_LEN = 4;
     // constexpr size MSG_LEN = 4096;
-    constexpr types::size MSG_LEN = 32 << 20;
-    constexpr types::size PAYLOAD_LEN = HEADER_LEN + MSG_LEN + 1;
+    constexpr types::size MAX_MSG_LEN = 32 << 20;
+    constexpr types::size PAYLOAD_LEN = HEADER_LEN + MAX_MSG_LEN + 1;
 
     class Payload
     {

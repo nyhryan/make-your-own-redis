@@ -64,6 +64,7 @@ namespace my_redis::sockets
     {
         while (n > 0)
         {
+            errno = 0; // Reset errno before read
             ssize bytesRead = ::read(fd, buffer, n);
             if (bytesRead <= 0)
             {

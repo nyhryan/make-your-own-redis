@@ -12,7 +12,9 @@ target_include_directories(${EXE} PRIVATE
 target_sources(${EXE} PRIVATE
     "../common/src/socket.cpp"
     "../common/src/payload.cpp"
-    "src/event.cpp"
+    "src/event/event_loop.cpp"
+    "src/event/event_poller.cpp"
+    "src/hashtable.cpp"
 )
 
 set_target_properties(${EXE} PROPERTIES

@@ -13,7 +13,7 @@ namespace my_redis::payload
     
     Payload::Payload(std::string_view message)
     {
-        if (message.length() > MSG_LEN)
+        if (message.length() > MAX_MSG_LEN)
         {
             throw std::runtime_error{"Message of the request is too long!"};
         }
@@ -57,7 +57,7 @@ namespace my_redis::payload
         }
 
         auto length = request.messageLength();
-        if (length > MSG_LEN)
+        if (length > MAX_MSG_LEN)
         {
             return false;
         }
